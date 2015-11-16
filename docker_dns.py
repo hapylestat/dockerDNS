@@ -2,6 +2,8 @@ from docker import Client
 import socket
 import time
 
+from dnslite.base import InputMessage
+
 # Book - http://www.zytrax.com/books/dns/ch15/
 
 
@@ -44,79 +46,11 @@ def recache(name):
     print(str(e))
 
 
-def bitfield(n):
-  return [int(digit) for digit in bin(n)[2:]] # [2:] to chop off the "0b" part
-
-class InputMessage(object):
-  _four_bytes = 0b0000000000001111
-  _one_byte = 0b0000000000000001
-  _base = 16
-  _flags = {
-    "qr": [1, _one_byte],
-    "opcode": [2, _four_bytes],
-    "aa": [6, _one_byte],
-    "tc": [7, _one_byte],
-    "rd": [8, _one_byte],
-    "ra": [9, _one_byte],
-    "res1": [10, _one_byte],
-    "res2": [11, _one_byte],
-    "res3": [12, _one_byte],
-    "rcode": [13, _four_bytes]
-  }
-
-  def _get_bit(self, _bitfield, name):
-    _bit_pos = self._base - self._flags[name][0]
-    _bit_mask = self._flags[name][1]
-    return (_bitfield >> _bit_pos) & _bit_mask
-
-  def __init__(self, _msg):
-    """
-    :type _msg byte
-    :param _msg Get byte array as input and form structured data
-    """
-    self.message_id = _msg[:2]
-    _pack1 = int.from_bytes(_msg[2:4], byteorder="big")
-    _qdcount = int.from_bytes(_msg[4:6], byteorder="big")
-    _ancount = int.from_bytes(_msg[6:8], byteorder="big")
-    _nscount = int.from_bytes(_msg[8:10], byteorder="big")
-    _arcount = int.from_bytes(_msg[10:12], byteorder="big")
-
-    #  decode header section
-    self.qr = self._get_bit(_pack1, "qr")
-    self.opcode = self._get_bit(_pack1, "opcode")
-    self.aa = self._get_bit(_pack1, "aa")
-    self.tc = self._get_bit(_pack1, "tc")
-    self.rd = self._get_bit(_pack1, "rd")
-    self.ra = self._get_bit(_pack1, "ra")
-    self.res1 = self._get_bit(_pack1, "res1")
-    self.res2 = self._get_bit(_pack1, "res2")
-    self.res3 = self._get_bit(_pack1, "res3")
-    self.rcode = self._get_bit(_pack1, "rcode")
-
-    # decode Question section
-
-    # decode Answer section
-
-    # decode Authority section
-
-    # decode Additional section
-
-
-
-  def __str__(self):
-    out = ""
-    for field in self.__dir__():
-      if field[:1] != "_" and field[:2] != "__" and not hasattr(self.__getattribute__(field), "__call__"):
-        out += "%s: %s\n" % (field, self.__getattribute__(field))
-    return out
-
-
-
 if __name__ == '__main__':
-  msg = b'9\xc5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x05node2\x04test\x02me\x00\x00\x01\x00\x01'
-  msg = InputMessage(msg)
-  print(msg)
-  exit(0)
+  # msg = b'9\xc5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x05node2\x04test\x02me\x00\x00\x01\x00\x01'
+  # msg = InputMessage(msg)
+  # print(msg)
+  # exit(0)
 
 
   c = Client("tcp://1.1.1.1:4243")
@@ -129,7 +63,9 @@ if __name__ == '__main__':
     while 1:
       data, addr = udps.recvfrom(1024)
       m = InputMessage(data)
-      print(m)
+
+      for item in m.question_section:
+        print(item)
 
       p = DNSQuery(data)
       domain = p.dominio[:-1]
