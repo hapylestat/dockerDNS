@@ -1,9 +1,14 @@
+import struct
+
+from dnslite.types import Header, QuestionItem, AnswerItem
+from dnslite.constants import OPCODE, RCODE, FLAG, u16bit
 
 
-from dnslite.types import Header, QuestionItem, read_byte
+# Book - http://www.zytrax.com/books/dns/ch15/
+# https://wiki.python.org/moin/BitManipulation
 
 
-class InputMessage(object):
+class DNSPacket(object):
   def __init__(self, _msg):
     """
     :type _msg byte
@@ -13,41 +18,20 @@ class InputMessage(object):
     #  parse data packet
     self.message_id = _msg[:2]
     _pack1 = int.from_bytes(_msg[2:4], byteorder="big")
-    _qdcount = int.from_bytes(_msg[4:6], byteorder="big")
-    _ancount = int.from_bytes(_msg[6:8], byteorder="big")
-    _nscount = int.from_bytes(_msg[8:10], byteorder="big")
-    _arcount = int.from_bytes(_msg[10:12], byteorder="big")
 
     # declare sections
-    self.question_section = []
-    self.answer_section = []
-    self.authority_section = []
-    self.additional_section = []
+    self.question_section = [None] * int.from_bytes(_msg[4:6], byteorder="big")
+    self.answer_section = [None] * int.from_bytes(_msg[6:8], byteorder="big")
+    self.authority_section = [None] * int.from_bytes(_msg[8:10], byteorder="big")
+    self.additional_section = [None] * int.from_bytes(_msg[10:12], byteorder="big")
 
     #  decode header section
     self.header = Header(_pack1)
 
     data_section = _msg[12:]
-
-    for i in range(0, _qdcount):
-      count = 1
-      domain = []
-
-      while count != 0:
-        count, data_section = read_byte(data_section, 1)
-        count = int.from_bytes(count, byteorder="big")
-        if count != 0:
-          domain_part, data_section = read_byte(data_section, count)
-          domain.append(domain_part.decode())
-
-
-      qtype, data_section = read_byte(data_section, 2)
-      qtype = int.from_bytes(qtype, byteorder="big")
-
-      qclass, data_section = read_byte(data_section, 2)
-      qclass = int.from_bytes(qclass, byteorder="big")
-
-      self.question_section.append(QuestionItem(domain, qtype, qclass))
+    for i in range(0, len(self.question_section)):
+      item, data_section = QuestionItem.parse(data_section)
+      self.question_section[i] = item
 
       # decode Question section
 
@@ -56,3 +40,35 @@ class InputMessage(object):
       # decode Authority section
 
       # decode Additional section
+
+  def get_question(self, index: int) -> QuestionItem:
+    return self.question_section[index]
+
+  def add_answer(self, answer: AnswerItem):
+    self.answer_section.append(answer)
+
+  def prepare_answer(self, rcode=RCODE.NO_ERROR):
+    self.header.rcode = rcode
+    #self.header.aa = FLAG.SET
+    #self.header.rd = FLAG.UNSET
+    self.header.qr = FLAG.SET
+
+  @property
+  def raw(self):
+    ret = b""
+
+    ret += self.message_id
+    ret += struct.pack(u16bit, self.header.raw)
+    #ret += struct.pack(u16bit, len(self.question_section))
+    ret += struct.pack(u16bit, 0)
+    ret += struct.pack(u16bit, len(self.answer_section))
+    ret += struct.pack(u16bit, len(self.authority_section))
+    ret += struct.pack(u16bit, len(self.additional_section))
+
+    # for item in self.question_section:
+    #   ret += item.raw
+
+    for item in self.answer_section:
+      ret += item.raw
+
+    return ret

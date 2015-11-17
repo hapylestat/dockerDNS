@@ -2,9 +2,11 @@ from docker import Client
 import socket
 import time
 
-from dnslite.base import InputMessage
+from dnslite.base import DNSPacket
+from dnslite.constants import RCODE
+from dnslite.types import ip_to_in_addr, QuestionItem
 
-# Book - http://www.zytrax.com/books/dns/ch15/
+
 
 
 class DNSQuery:
@@ -37,47 +39,59 @@ class DNSQuery:
 ipsettings = {}
 
 
-def recache(name):
+def recache(q: QuestionItem):
   global ipsettings
   try:
-    info = c.inspect_container(name)
-    ipsettings[name] = info["NetworkSettings"]["IPAddress"]
+    info = c.inspect_container(q.qname[0])
+    ipsettings[q.qname_str] = info["NetworkSettings"]["IPAddress"]
   except Exception as e:
     print(str(e))
 
 
 if __name__ == '__main__':
   # msg = b'9\xc5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x05node2\x04test\x02me\x00\x00\x01\x00\x01'
-  # msg = InputMessage(msg)
+  # msg = DNSPacket(msg)
   # print(msg)
   # exit(0)
-
 
   c = Client("tcp://1.1.1.1:4243")
   ip = '127.0.0.1'
 
   udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  udps.bind(('127.0.0.3', 53))
+  myip = "127.0.0.3"
+  myip_inaddr = ip_to_in_addr("127.0.0.3", 4)
+  udps.bind((myip, 53))
+
+  ipsettings[myip_inaddr] = "127.0.0.1"
 
   try:
     while 1:
       data, addr = udps.recvfrom(1024)
-      m = InputMessage(data)
+      print(data)
+      m = DNSPacket(data)
 
       for item in m.question_section:
         print(item)
 
-      p = DNSQuery(data)
-      domain = p.dominio[:-1]
-      domain = domain.split(".")[0]
-      recache(domain)
+      #p = DNSQuery(data)
+      q = m.get_question(0)
 
-      if domain in ipsettings:
-        ip = ipsettings[domain]
+      if q.qtype_name == "A" and q.qname_str != myip_inaddr:
+        recache(q)
+        if q.qname_str in ipsettings:
+          ip = ipsettings[q.qname_str]
+          m.add_answer(q.get_answer(ip))
+        m.prepare_answer()
+      elif q.qtype_name == "PTR" and q.qname_str == myip_inaddr:
+        m.add_answer(q.get_answer("fake.server"))
+        m.prepare_answer()
+      else:
+        m.prepare_answer(RCODE.NOT_IMPLEMENTED)
 
-      udps.sendto(p.response(ip), addr)
+      print(m.raw)
+      udps.sendto(m.raw, addr)
 
-      print('Response: %s -> %s' % (p.dominio, ip))
+      print('Response: %s. -> %s' % (".".join(m.get_question(0).qname), ip))
       time.sleep(0.02)
   except KeyboardInterrupt:
     print('Finalize')

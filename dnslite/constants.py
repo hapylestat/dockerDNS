@@ -1,4 +1,22 @@
 
+class RCODE(object):
+  NO_ERROR = 0
+  FORMAT_ERROR = 1
+  SERVER_FAILURE = 2
+  NAME_ERROR = 3
+  NOT_IMPLEMENTED = 4
+  REFUSED = 5
+
+
+class OPCODE(object):
+  QUERY = 0
+  IQUERY = 1
+  STATUS = 2
+
+class FLAG(object):
+  SET = 1
+  UNSET = 0
+
 question_types = {
   1: "A",
   2: "NS",
@@ -85,19 +103,22 @@ question_types = {
   65535: "Reserved"
 }
 
+u16bit = ">H"
+u32bit = ">I"
+u8bit = ">B"
 
-__four_bytes_mask = 0b0000000000001111
-__one_byte_mask = 0b0000000000000001
+__four_bytes_mask = 0b1111
+__one_byte_mask = 0b1
 base_len = 16
 header_flags = {
-  "qr": [1, __one_byte_mask],
-  "opcode": [2, __four_bytes_mask],
-  "aa": [6, __one_byte_mask],
-  "tc": [7, __one_byte_mask],
-  "rd": [8, __one_byte_mask],
-  "ra": [9, __one_byte_mask],
-  "res1": [10, __one_byte_mask],
-  "res2": [11, __one_byte_mask],
-  "res3": [12, __one_byte_mask],
-  "rcode": [13, __four_bytes_mask]
+  "qr": [0, __one_byte_mask],
+  "opcode": [1, __four_bytes_mask],  # 16 bytes
+  "aa": [5, __one_byte_mask],
+  "tc": [6, __one_byte_mask],
+  "rd": [7, __one_byte_mask],
+  "ra": [8, __one_byte_mask],
+  "res1": [9, __one_byte_mask],
+  "res2": [10, __one_byte_mask],
+  "res3": [11, __one_byte_mask],
+  "rcode": [12, __four_bytes_mask]
 }
