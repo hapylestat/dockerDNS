@@ -87,8 +87,8 @@ def pack_ptr_response(name) -> tuple:
 def unpack_a_response(data: bytes) -> list:
   ret = [-1] * 4
   for i in range(0, 4):
-    octet, data = bread(data, 1)
-    ret[i] = int.from_bytes(octet, byteorder="big")
+    octet, data = bread(data, 1, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
+    ret[i] = octet
 
   return ret
 
@@ -97,8 +97,7 @@ def unpack_ptr_response(data: bytes) -> str:
   size = -1
   _str = []
   while size != 0:  # ToDo: add check if packet is malformed and no zero flag at the end
-    size, data = bread(data, 1)
-    size = int.from_bytes(size, byteorder="big")
+    size, data = bread(data, 1, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
     if size != 0:
       lbl, data = bread(data, size)
       _str.append(lbl.decode(encoding="utf-8"))
