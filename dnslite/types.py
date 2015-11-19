@@ -1,44 +1,10 @@
 
 
-from dnslite.constants import question_types, header_flags, base_len, u16bit, u32bit, u8bit
+from dnslite.constants import question_types,  u16bit, u32bit
 import struct
 
-
-def ip_to_in_addr(ipstring: str, ver: int = 4) -> str:
-  if ver == 4:
-    ip = ipstring.split(".")
-    ip.reverse()
-    return ".".join(ip + ["in-addr", "arpa"])
-
-
-def get_bit(_bitfield, name):
-  _bit_mask = header_flags[name][1]
-  _bit_len = _bit_mask.bit_length()
-  _bit_pos = base_len - header_flags[name][0] - _bit_len
-
-  return (_bitfield >> _bit_pos) & _bit_mask
-
-
-def set_bit(_bitfield, name, value=0b1):
-  _bit_mask = header_flags[name][1]
-  _bit_len = _bit_mask.bit_length()
-  _bit_pos = base_len - header_flags[name][0] - _bit_len
-
-  return _bitfield | (value << _bit_pos)
-
-
-def read_byte(byte_data, count):
-  return byte_data[:count], byte_data[count:]
-
-
-def make_label(domain: list) -> bytes:
-  ret = b""
-  for item in domain:
-    ret += bytes([len(item)])
-    ret += item.encode(encoding="utf-8")
-
-  ret += bytes([0])
-  return ret
+from dnslite.datapack import make_label, bread, pack_a_response, pack_ptr_response, get_bit, set_bit, \
+  unpack_a_response, unpack_ptr_response
 
 
 class QuestionItem(object):
@@ -71,7 +37,6 @@ class QuestionItem(object):
   def __str__(self):
     return "name: %s; type: %s (%s); class: %s" % (".".join(self.qname), self.qtype_name, self.qtype, self.qclass)
 
-  @property
   def raw(self) -> bytes:
     b = b""
     b += make_label(self._qname)
@@ -100,29 +65,29 @@ class QuestionItem(object):
     count = -1
 
     while count != 0:
-      count, bytedata = read_byte(bytedata, 1)
+      count, bytedata = bread(bytedata, 1)
       count = int.from_bytes(count, byteorder="big")
       if count != 0:
-        domain_part, bytedata = read_byte(bytedata, count)
+        domain_part, bytedata = bread(bytedata, count)
         domain.append(domain_part.decode())
 
-    qtype, bytedata = read_byte(bytedata, 2)
+    qtype, bytedata = bread(bytedata, 2)
     qtype = int.from_bytes(qtype, byteorder="big")
 
-    qclass, bytedata = read_byte(bytedata, 2)
+    qclass, bytedata = bread(bytedata, 2)
     qclass = int.from_bytes(qclass, byteorder="big")
 
     return QuestionItem(domain, qtype, qclass), bytedata
 
 
 class AnswerItem(object):
-  def __init__(self, question: QuestionItem, rtype=None, data=None):
+  def __init__(self, question: QuestionItem, rtype=None, data=None, ttl=2800):
     self._q = question
     self.__fqdn = False
-    self._name = question.qname[0] if len(question.qname) > 0 else ""
+    self._name = question.qname
     self._type = question.qtype  # u16bit
     self._class = question.qclass  # u16bit
-    self._ttl = 2800  # u32bit
+    self._ttl = ttl  # u32bit
     self._data = data
     self._rtype = rtype
 
@@ -131,11 +96,36 @@ class AnswerItem(object):
     self._rtype = _type
 
   @property
-  def raw(self):
-    body = b""
-    body += struct.pack(u16bit, 0b1100000000000010)  # 16 bytes record, type 11, start 2 bytes
+  def ttl(self):
+    return self._ttl
 
-    body += make_label(self._q.qname)
+  @property
+  def atype(self):
+    return self._type
+
+  @property
+  def value(self):
+    return self._data
+
+  @property
+  def name(self):
+    return self._name
+
+  @name.setter
+  def name(self, value):
+    self._name = value
+
+  def raw(self, offset):
+    """
+    :param offset: offset from begin of the message for the name label
+    :return:
+    """
+    body = b""
+
+    if offset < 1:
+      offset = 0
+
+    body += struct.pack(u16bit, 0b1100000000000000 + offset)  # 16 bytes record, type 11, start 2 bytes
     body += struct.pack(u16bit, self._type)
     body += struct.pack(u16bit, self._class)
     body += struct.pack(u32bit, self._ttl)
@@ -143,9 +133,9 @@ class AnswerItem(object):
     ipdata = None
     size = None
     if self._rtype == 1:  # A record
-      ipdata, size = self.__get_a_response(self._data)
+      ipdata, size = pack_a_response(self._data)
     elif self._rtype == 12:  # PTR record
-      ipdata, size = self.__get_ptr_response(self._data)
+      ipdata, size = pack_ptr_response(self._data)
 
     if ipdata is None:
       return None
@@ -154,24 +144,43 @@ class AnswerItem(object):
     body += ipdata
     return body
 
-  def __get_a_response(self, ip) -> tuple:
-    if isinstance(ip, str):  # convert ip string xxx.xxx.xxx.xxx to [xxx,xxx,xxx,xxx] of int
-      ip = list(map(lambda x: int(x), ip.split(".")))
+  @staticmethod
+  def parse(bytedata: bytes) -> tuple:
+    """
+    :param bytedata data, from the dns packet stream
+    :return: tuple(AnswerItem, rest of bytedata)
+    :rtype AnswerItem, bytes
+    """
 
-    if isinstance(ip, list) or isinstance(ip, tuple):  # make sure, that list contain integers
-      ip = list(map(lambda x: int(x), ip))
+    name_field, bytedata = bread(bytedata, 2)
+    name_field = int.from_bytes(name_field, byteorder="big")
 
-    bdata = b""
-    for ipitem in ip:
-      bdata += struct.pack(u8bit, ipitem)
-    return bdata, len(bdata)
+    # 0bXY00000000000000 - X: 1 Y: 1 -> 11, X:0 Y:1 -> 1, X:1 Y:0 -> 10
+    name_type = 10 * ((name_field >> 15) & 0b1) + ((name_field >> 14) & 0b1)
+    name_offset = name_field & 0b001111111111111
 
-  def __get_ptr_response(self, name) -> tuple:
-    if isinstance(name, str):
-      name = name.split(".")
+    assert name_type == 11
 
-    ret = make_label(name)
-    return ret, len(ret)
+    _type, bytedata = bread(bytedata, 2)
+    _type = int.from_bytes(_type, byteorder="big")
+
+    _class, bytedata = bread(bytedata, 2)
+    _class = int.from_bytes(_class, byteorder="big")
+
+    _ttl, bytedata = bread(bytedata, 4)
+    _ttl = int.from_bytes(_ttl, byteorder="big")
+
+    rdlen, bytedata = bread(bytedata, 2)
+    rdlen = int.from_bytes(rdlen, byteorder="big")
+
+    rddata, bytedata = bread(bytedata, rdlen)
+
+    if _type == 1:  # a record
+      rddata = unpack_a_response(rddata)
+    elif _type == 12:  # ptr record
+      rddata = unpack_ptr_response(rddata)
+
+    return AnswerItem(QuestionItem(name_offset, _type, _class), _type, rddata, _ttl), bytedata
 
 
 class Header(object):

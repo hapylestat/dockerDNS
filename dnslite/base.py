@@ -1,5 +1,6 @@
 import struct
 
+from dnslite.datapack import bread
 from dnslite.types import Header, QuestionItem, AnswerItem
 from dnslite.constants import OPCODE, RCODE, FLAG, u16bit
 
@@ -15,31 +16,58 @@ class DNSPacket(object):
     :param _msg Get byte array as input and form structured data
     """
 
+    offset = 0
+
     #  parse data packet
-    self.message_id = _msg[:2]
-    _pack1 = int.from_bytes(_msg[2:4], byteorder="big")
+    self.message_id, _msg, offset = bread(_msg, 2, offset)
+
+    _pack1, _msg, offset = bread(_msg, 2, offset, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
 
     # declare sections
-    self.question_section = [None] * int.from_bytes(_msg[4:6], byteorder="big")
-    self.answer_section = [None] * int.from_bytes(_msg[6:8], byteorder="big")
-    self.authority_section = [None] * int.from_bytes(_msg[8:10], byteorder="big")
-    self.additional_section = [None] * int.from_bytes(_msg[10:12], byteorder="big")
+    _size, _msg, offset = bread(_msg, 2, offset, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
+    self.question_section = [None] * _size
+    # required to store question section offsets for answer_section "name"
+    question_offset_grid = [None] * _size
+
+    _size, _msg, offset = bread(_msg, 2, offset, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
+    self.answer_section = [None] * _size
+
+    _size, _msg, offset = bread(_msg, 2, offset, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
+    self.authority_section = [None] * _size
+
+    _size, _msg, offset = bread(_msg, 2, offset, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
+    self.additional_section = [None] * _size
 
     #  decode header section
     self.header = Header(_pack1)
 
-    data_section = _msg[12:]
+    # decode Question section
     for i in range(0, len(self.question_section)):
-      item, data_section = QuestionItem.parse(data_section)
+      la = len(_msg)
+      item, _msg = QuestionItem.parse(_msg)
+      lb = len(_msg)
+      question_offset_grid[i] = offset
       self.question_section[i] = item
+      offset += la - lb
 
-      # decode Question section
+    # decode Answer section
+    for i in range(0, len(self.answer_section)):
+      la = len(_msg)
+      item, _msg = AnswerItem.parse(_msg)
+      lb = len(_msg)
 
-      # decode Answer section
+      # here we will get answer name from the offset
+      loffset = item.name
+      for x in range(0, len(question_offset_grid)):
+        if question_offset_grid[x] <= loffset:
+          item.name = self.question_section[x].qname
 
-      # decode Authority section
+      self.answer_section[i] = item
+      offset += la - lb
 
-      # decode Additional section
+    # decode Authority section
+
+    # decode Additional section
 
   def get_question(self, index: int) -> QuestionItem:
     return self.question_section[index]
@@ -49,26 +77,26 @@ class DNSPacket(object):
 
   def prepare_answer(self, rcode=RCODE.NO_ERROR):
     self.header.rcode = rcode
-    #self.header.aa = FLAG.SET
-    #self.header.rd = FLAG.UNSET
+    self.header.aa = FLAG.SET
+    self.header.rd = FLAG.UNSET
     self.header.qr = FLAG.SET
 
-  @property
   def raw(self):
     ret = b""
-
+    qoffset = [-1] * len(self.question_section)
     ret += self.message_id
     ret += struct.pack(u16bit, self.header.raw)
-    #ret += struct.pack(u16bit, len(self.question_section))
-    ret += struct.pack(u16bit, 0)
+    ret += struct.pack(u16bit, len(self.question_section))
     ret += struct.pack(u16bit, len(self.answer_section))
     ret += struct.pack(u16bit, len(self.authority_section))
     ret += struct.pack(u16bit, len(self.additional_section))
 
-    # for item in self.question_section:
-    #   ret += item.raw
+    for i in range(0, len(self.question_section)):
+      qoffset[i] = len(ret)
+      ret += self.question_section[i].raw()
 
-    for item in self.answer_section:
-      ret += item.raw
+    for i in range(0, len(self.answer_section)):
+      offset = qoffset[i] if len(qoffset) >= i else -1
+      ret += self.answer_section[i].raw(offset)
 
     return ret

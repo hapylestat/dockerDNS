@@ -4,7 +4,8 @@ import time
 
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE
-from dnslite.types import ip_to_in_addr, QuestionItem
+from dnslite.types import QuestionItem
+from dnslite.datapack import ip_to_in_addr
 
 
 
@@ -49,10 +50,6 @@ def recache(q: QuestionItem):
 
 
 if __name__ == '__main__':
-  # msg = b'9\xc5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x05node2\x04test\x02me\x00\x00\x01\x00\x01'
-  # msg = DNSPacket(msg)
-  # print(msg)
-  # exit(0)
 
   c = Client("tcp://1.1.1.1:4243")
   ip = '127.0.0.1'
@@ -67,13 +64,12 @@ if __name__ == '__main__':
   try:
     while 1:
       data, addr = udps.recvfrom(1024)
-      print(data)
       m = DNSPacket(data)
 
       for item in m.question_section:
         print(item)
 
-      #p = DNSQuery(data)
+      p = DNSQuery(data)
       q = m.get_question(0)
 
       if q.qtype_name == "A" and q.qname_str != myip_inaddr:
@@ -88,8 +84,7 @@ if __name__ == '__main__':
       else:
         m.prepare_answer(RCODE.NOT_IMPLEMENTED)
 
-      print(m.raw)
-      udps.sendto(m.raw, addr)
+      udps.sendto(m.raw(), addr)
 
       print('Response: %s. -> %s' % (".".join(m.get_question(0).qname), ip))
       time.sleep(0.02)
