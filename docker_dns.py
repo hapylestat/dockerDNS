@@ -37,14 +37,14 @@ class DNSQuery:
       packet += byte_ip  # 4bytes of IP
     return packet
 
-ipsettings = {}
+ip_cache = {}
 
 
 def recache(q: QuestionItem):
-  global ipsettings
+  global ip_cache
   try:
     info = c.inspect_container(q.qname[0])
-    ipsettings[q.qname_str] = info["NetworkSettings"]["IPAddress"]
+    ip_cache[q.qname_str] = info["NetworkSettings"]["IPAddress"]
   except Exception as e:
     print(str(e))
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
   myip_inaddr = ip_to_in_addr("127.0.0.3", 4)
   udps.bind((myip, 53))
 
-  ipsettings[myip_inaddr] = "127.0.0.1"
+  ip_cache[myip_inaddr] = "127.0.0.1"
 
   try:
     while 1:
@@ -72,17 +72,20 @@ if __name__ == '__main__':
       p = DNSQuery(data)
       q = m.get_question(0)
 
+      RET_CODE = RCODE.NO_ERROR
       if q.qtype_name == "A" and q.qname_str != myip_inaddr:
         recache(q)
-        if q.qname_str in ipsettings:
-          ip = ipsettings[q.qname_str]
+        if q.qname_str in ip_cache:
+          ip = ip_cache[q.qname_str]
           m.add_answer(q.get_answer(ip))
-        m.prepare_answer()
+        else:
+          RET_CODE = RCODE.SERVER_FAILURE
       elif q.qtype_name == "PTR" and q.qname_str == myip_inaddr:
-        m.add_answer(q.get_answer("fake.server"))
-        m.prepare_answer()
+          m.add_answer(q.get_answer("fake.server"))
       else:
-        m.prepare_answer(RCODE.NOT_IMPLEMENTED)
+        RET_CODE = RCODE.NOT_IMPLEMENTED
+
+      m.prepare_answer(RET_CODE)
 
       udps.sendto(m.raw(), addr)
 

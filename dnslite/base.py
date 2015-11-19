@@ -73,9 +73,19 @@ class DNSPacket(object):
     return self.question_section[index]
 
   def add_answer(self, answer: AnswerItem):
+    """
+    Add answer item to the list of the answers
+    :param answer:
+    :return:
+    """
     self.answer_section.append(answer)
 
   def prepare_answer(self, rcode=RCODE.NO_ERROR):
+    """
+    Prepare dns packet to be sent back to the client
+    :param rcode: one of the RCODE variable, represent the status of the query
+    :return:
+    """
     self.header.rcode = rcode
     self.header.aa = FLAG.SET
     self.header.rd = FLAG.UNSET
