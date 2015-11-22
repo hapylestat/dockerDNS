@@ -1,4 +1,6 @@
-# DockerDNS
+# DockerDNS  
+
+![LGPLv3][logo]
 
 DockerDNS is a little dns server, which populate containers ip by their names thought dns. This 
 solve problems with random generated ip's of the docker container and gives possibility to serve the application
@@ -52,3 +54,6 @@ WantedBy=multi-user.target
 - systemctl daemon-reload
 - systemctl enable dockerdns
 - systemctl start dockerdns 
+
+
+[logo]: http://www.gnu.org/graphics/lgplv3-147x51.png
