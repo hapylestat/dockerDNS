@@ -69,7 +69,7 @@ def handle_connection(sock):
     if q.qtype_name in handlers:
       answer = handlers[q.qtype_name](q)
       if answer is None:
-        RET_CODE = RCODE.SERVER_FAILURE
+        pass  # send back empty answer section
       else:
         m.add_answer(answer)
     else:
