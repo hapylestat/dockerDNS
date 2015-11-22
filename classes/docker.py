@@ -24,7 +24,7 @@ class DockerInfo(object):
       info = self._conn.inspect_container(name[0])
       if info is not None:
         if "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
-          return info["NetworkSettings"]["IPAddress"]
+          return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
     except Exception as e:
       return None
     return None
