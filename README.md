@@ -40,7 +40,7 @@ Requires=docker.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/srv/dockerDNS/docker_dns.py
+ExecStart=/usr/bin/python3 /path/to/server/docker_dns.py
 ExecStop=/bin/kill -s QUIT $MAINPID
 User=root
 Group=root
