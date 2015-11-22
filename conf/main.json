@@ -6,7 +6,7 @@
     "url": "tcp://1.1.1.1:4243"
   },
   "logging":{
-    "log_level": "info",
+    "log_level": "debug",
     "enabled": true,
     "url_log": true,
     "file": "",

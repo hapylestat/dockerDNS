@@ -7,9 +7,9 @@
 
 import struct
 
-from dnslite.datapack import bread
+from dnslite.datapack import bread, generate_message_id
 from dnslite.types import Header, QuestionItem, AnswerItem
-from dnslite.constants import OPCODE, RCODE, FLAG, u16bit
+from dnslite.constants import RCODE, FLAG, u16bit, QuestionTypes
 
 
 # Book - http://www.zytrax.com/books/dns/ch15/
@@ -17,11 +17,19 @@ from dnslite.constants import OPCODE, RCODE, FLAG, u16bit
 
 
 class DNSPacket(object):
-  def __init__(self, _msg):
+  def __init__(self, _msg=None):
     """
     :type _msg byte
     :param _msg Get byte array as input and form structured data
     """
+    if _msg is None:
+      self.message_id = generate_message_id()
+      self.header = Header()
+      self.question_section = []
+      self.answer_section = []
+      self.authority_section = []
+      self.additional_section = []
+      return
 
     offset = 0
 
@@ -73,8 +81,34 @@ class DNSPacket(object):
       offset += la - lb
 
     # decode Authority section
+    for i in range(0, len(self.authority_section)):
+      la = len(_msg)
+      item, _msg = AnswerItem.parse(_msg)
+      lb = len(_msg)
+
+      # here we will get answer name from the offset
+      loffset = item.name
+      for x in range(0, len(question_offset_grid)):
+        if question_offset_grid[x] <= loffset:
+          item.name = self.question_section[x].qname
+
+      self.authority_section[i] = item
+      offset += la - lb
 
     # decode Additional section
+    # for i in range(0, len(self.additional_section)):
+    #   la = len(_msg)
+    #   item, _msg = AnswerItem.parse(_msg)
+    #   lb = len(_msg)
+    #
+    #   # here we will get answer name from the offset
+    #   loffset = item.name
+    #   for x in range(0, len(question_offset_grid)):
+    #     if question_offset_grid[x] <= loffset:
+    #       item.name = self.question_section[x].qname
+    #
+    #   self.additional_section[i] = item
+    #   offset += la - lb
 
   def get_question(self, index: int) -> QuestionItem:
     return self.question_section[index]

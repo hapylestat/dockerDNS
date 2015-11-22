@@ -8,7 +8,7 @@
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 from dnslite.base import DNSPacket
-from dnslite.constants import RCODE
+from dnslite.constants import RCODE, QuestionTypes
 from dnslite.datapack import ip_to_in_addr
 from classes.config import Configuration
 from classes.docker import doker
@@ -32,7 +32,7 @@ def handle_a_record(q: QuestionItem) -> AnswerItem:
   else:
     ip = doker.get_ip_info(q.qname_str)
     if ip is None:
-      return None
+      return RCODE.NAME_ERROR
 
     answer = q.get_answer(ip)
   return answer
@@ -46,8 +46,10 @@ def handle_ptr_record(q: QuestionItem) -> AnswerItem:
 
   return answer
 
+
 def handle_aaaa_record(q: QuestionItem) -> AnswerItem:
   return None
+
 
 def handle_connection(sock):
   handlers = {
@@ -64,18 +66,20 @@ def handle_connection(sock):
       log.debug(item)
 
     q = m.get_question(0)
-    RET_CODE = RCODE.NO_ERROR
+    ret_code = RCODE.NO_ERROR
 
     if q.qtype_name in handlers:
       answer = handlers[q.qtype_name](q)
       if answer is None:
         pass  # send back empty answer section
+      elif isinstance(answer, int):
+        ret_code = answer
       else:
         m.add_answer(answer)
     else:
-      RET_CODE = RCODE.NOT_IMPLEMENTED
+      ret_code = RCODE.NOT_IMPLEMENTED
 
-    m.prepare_answer(RET_CODE)
+    m.prepare_answer(ret_code)
     sock.sendto(m.raw(), addr)
 
 

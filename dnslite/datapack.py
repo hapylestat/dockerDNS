@@ -7,7 +7,9 @@
 
 import struct
 
-from dnslite.constants import u8bit, header_flags, base_len
+from dnslite.constants import u8bit, header_flags, base_len, u16bit, QuestionTypes
+import time
+import random
 
 
 def ip_to_in_addr(ipstring: str, ver: int = 4) -> str:
@@ -31,6 +33,15 @@ def set_bit(_bitfield, name, value=0b1):
   _bit_pos = base_len - header_flags[name][0] - _bit_len
 
   return _bitfield | (value << _bit_pos)
+
+
+def generate_message_id() -> bytes:
+  random.seed(time.time())
+  msgid = random.randrange(1, 39999)
+  if msgid.bit_length() <= 16:
+    return struct.pack(u16bit, msgid)
+  else:
+    raise TypeError("Non 16-bit seed used")
 
 
 def bread(byte_data: bytes, count: int, update_offset: int=None, data_fx=None):
@@ -100,6 +111,15 @@ def unpack_ptr_response(data: bytes) -> str:
     size, data = bread(data, 1, data_fx=lambda x: int.from_bytes(x, byteorder="big"))
     if size != 0:
       lbl, data = bread(data, size)
-      _str.append(lbl.decode(encoding="utf-8"))
+      try:
+        _str.append(lbl.decode(encoding="utf-8"))
+      except UnicodeDecodeError:
+        _str.append("<invalid format>")
 
   return ".".join(_str)
+
+
+# register packer/unpacker
+QuestionTypes.set_fx("A", pack_a_response, unpack_a_response)
+QuestionTypes.set_fx("PTR", pack_ptr_response, unpack_ptr_response)
+QuestionTypes.set_fx("NS", pack_ptr_response, unpack_ptr_response)

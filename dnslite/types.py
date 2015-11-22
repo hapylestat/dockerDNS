@@ -6,19 +6,27 @@
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 
-from dnslite.constants import question_types,  u16bit, u32bit
+from dnslite.constants import QuestionTypes, u16bit, u32bit, FLAG
 import struct
 
-from dnslite.datapack import make_label, bread, pack_a_response, pack_ptr_response, get_bit, set_bit, \
-  unpack_a_response, unpack_ptr_response
+from dnslite.datapack import make_label, bread, get_bit, set_bit
 
 
 class QuestionItem(object):
-  def __init__(self, qname, qtype, qclass):
+  def __init__(self, qname, qtype: int, qclass: int):
+    """
+    :param qname: question subject
+    :param qtype: question type
+    :param qclass: question class
+    :return:
+    """
+    if isinstance(qname, str) and qtype == 1:
+      qname = qname.split(".")
+
     self._qname = qname
     self._qtype = int(qtype)
     self._qclass = qclass
-    self._qtype_str = question_types[qtype] if qtype in question_types else qtype
+    self._qtype_str = QuestionTypes.get(qtype).qname
 
   @property
   def qname(self) -> list:
@@ -135,13 +143,7 @@ class AnswerItem(object):
     body += struct.pack(u16bit, self._type)
     body += struct.pack(u16bit, self._class)
     body += struct.pack(u32bit, self._ttl)
-
-    ipdata = None
-    size = None
-    if self._rtype == 1:  # A record
-      ipdata, size = pack_a_response(self._data)
-    elif self._rtype == 12:  # PTR record
-      ipdata, size = pack_ptr_response(self._data)
+    ipdata, size = QuestionTypes.pack(self._rtype, self._data)
 
     if ipdata is None:
       return None
@@ -180,17 +182,28 @@ class AnswerItem(object):
     rdlen = int.from_bytes(rdlen, byteorder="big")
 
     rddata, bytedata = bread(bytedata, rdlen)
-
-    if _type == 1:  # a record
-      rddata = unpack_a_response(rddata)
-    elif _type == 12:  # ptr record
-      rddata = unpack_ptr_response(rddata)
+    rddata = QuestionTypes.unpack(_type, rddata)
 
     return AnswerItem(QuestionItem(name_offset, _type, _class), _type, rddata, _ttl), bytedata
 
 
 class Header(object):
-  def __init__(self, bin_content):
+  def __init__(self, bin_content=None):
+    self.qr = FLAG.UNSET
+    self.opcode = FLAG.UNSET
+    self.aa = FLAG.UNSET
+    self.tc = FLAG.UNSET
+    self.rd = FLAG.UNSET
+    self.ra = FLAG.UNSET
+    self.res1 = FLAG.UNSET
+    self.res2 = FLAG.UNSET
+    self.res3 = FLAG.UNSET
+    self.rcode = FLAG.UNSET
+
+    if bin_content is not None:
+      self.__init_from_bin(bin_content)
+
+  def __init_from_bin(self, bin_content):
     self.qr = get_bit(bin_content, "qr")
     self.opcode = get_bit(bin_content, "opcode")
     self.aa = get_bit(bin_content, "aa")
