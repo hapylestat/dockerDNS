@@ -6,6 +6,14 @@ DockerDNS is a little dns server, which populate containers ip by their names th
 solve problems with random generated ip's of the docker container and gives possibility to serve the application
 to the external world.
 
+# Requirements
+ - python 3
+ - docker-py (can be installed via pip)
+ 
+# How To Install
+  - git clone https://github.com/hapylestat/dockerDNS.git
+  - adjust settings in *conf/main.json* (doker.url option supports tcp and unix sockets)
+  - now you need just run server: *python3 doker_dns.py*
 
 # How To Use
 
@@ -22,16 +30,28 @@ DockerDNS could be perfectly used for reverse proxying docker container http por
  - use dockerDNS
  
  All options will help, however second one not require any special tuning or magic with container, as result is more easy and can be configured more faster
+
+# Nginx configuration sample (reverse proxy)
+```
+server {
+    listen       127.0.0.1:80;
+    server_name  my.docker.server;
+
+    #  where 127.0.0.3 is an address of dockerDNS
+    resolver 127.0.0.3 ipv6=off;
+    set $upstream "http://container-name:80";
+
+
+    location / {
+        proxy_pass          $upstream;
+        proxy_http_version  1.1;
+        proxy_set_header    X-Forwarded-For $remote_addr;
+        proxy_set_header    Host $server_name:$server_port;
+    }
+}
+```
  
-# Requirements
- - python 3
- - docker-py (can be installed via pip)
  
-# How To Install
-  - git clone https://github.com/hapylestat/dockerDNS.git
-  - adjust settings in *conf/main.json* (doker.url option supports tcp and unix sockets)
-  - now you need just run server: *python3 doker_dns.py*
-  
 # Install as system service, systemd example:
 - create **dockerdns.service** file:
 ```
