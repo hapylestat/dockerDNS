@@ -1,66 +1,91 @@
-from docker import Client
+#!/usr/bin/python3
+
 import socket
-import time
 
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE
-from dnslite.types import QuestionItem
 from dnslite.datapack import ip_to_in_addr
+from classes.config import Configuration
+from classes.docker import doker
+from classes.logger import alogger
+from dnslite.types import QuestionItem, AnswerItem
+
+import threading
 
 
-ip_cache = {}
+conf = Configuration.get_instance()
+log = alogger.getLogger("main", conf)
+listen = conf.get("listen", default="127.0.0.1", check_type=str)
+port = conf.get("port", default=53, check_type=int)
+listen_ptr = ip_to_in_addr(listen, 4)
+myname = conf.get("myname", default="FakeServer", check_type=str)
 
 
-def recache(q: QuestionItem):
-  global ip_cache
+def handle_a_record(q: QuestionItem) -> AnswerItem:
+  if q.qname_str == myname:
+    answer = q.get_answer(listen)
+  else:
+    ip = doker.get_ip_info(q.qname_str)
+    if ip is None:
+      return None
+
+    answer = q.get_answer(ip)
+  return answer
+
+
+def handle_ptr_record(q: QuestionItem) -> AnswerItem:
+  if q.qname_str == listen_ptr:
+    answer = q.get_answer(myname)
+  else:
+    answer = None
+
+  return answer
+
+
+def handle_connection(sock):
+  handlers = {
+    "A": handle_a_record,
+    "PTR": handle_ptr_record
+  }
+
+  while True:
+    data, addr = sock.recvfrom(1024)
+    m = DNSPacket(data)
+
+    for item in m.question_section:
+      log.debug(item)
+
+    q = m.get_question(0)
+    RET_CODE = RCODE.NO_ERROR
+
+    if q.qtype_name in handlers:
+      answer = handlers[q.qtype_name](q)
+      if answer is None:
+        RET_CODE = RCODE.SERVER_FAILURE
+      else:
+        m.add_answer(answer)
+    else:
+      RET_CODE = RCODE.NOT_IMPLEMENTED
+
+    m.prepare_answer(RET_CODE)
+    sock.sendto(m.raw(), addr)
+
+
+def main():
+  log.info("Start listening on udp %s:%s...", listen, port)
+  udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  udps.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  udps.bind((listen, port))
+
+  th = threading.Thread(target=handle_connection, args=(udps,))
+  th.start()
+
   try:
-    info = c.inspect_container(q.qname[0])
-    ip_cache[q.qname_str] = info["NetworkSettings"]["IPAddress"]
-  except Exception as e:
-    print(str(e))
-
+    th.join()
+  except KeyboardInterrupt:
+    log.info("User interrupt, exiting....")
+  finally:
+    udps.close()
 
 if __name__ == '__main__':
-
-  c = Client("tcp://1.1.1.1:4243")
-  ip = '127.0.0.1'
-
-  udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  myip = "127.0.0.3"
-  myip_inaddr = ip_to_in_addr("127.0.0.3", 4)
-  udps.bind((myip, 53))
-
-  ip_cache[myip_inaddr] = "127.0.0.1"
-
-  try:
-    while 1:
-      data, addr = udps.recvfrom(1024)
-      m = DNSPacket(data)
-
-      for item in m.question_section:
-        print(item)
-
-      q = m.get_question(0)
-
-      RET_CODE = RCODE.NO_ERROR
-      if q.qtype_name == "A" and q.qname_str != myip_inaddr:
-        recache(q)
-        if q.qname_str in ip_cache:
-          ip = ip_cache[q.qname_str]
-          m.add_answer(q.get_answer(ip))
-        else:
-          RET_CODE = RCODE.SERVER_FAILURE
-      elif q.qtype_name == "PTR" and q.qname_str == myip_inaddr:
-          m.add_answer(q.get_answer("fake.server"))
-      else:
-        RET_CODE = RCODE.NOT_IMPLEMENTED
-
-      m.prepare_answer(RET_CODE)
-
-      udps.sendto(m.raw(), addr)
-
-      print('Response: %s. -> %s' % (".".join(m.get_question(0).qname), ip))
-      time.sleep(0.02)
-  except KeyboardInterrupt:
-    print('Finalize')
-    udps.close()
+  main()

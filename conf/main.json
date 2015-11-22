@@ -1,0 +1,18 @@
+{
+  "listen": "127.0.0.3",
+  "port": 53,
+  "myname": "dockerDNS",
+  "docker": {
+    "url": "tcp://1.1.1.1:4243"
+  },
+  "logging":{
+    "log_level": "info",
+    "enabled": true,
+    "url_log": true,
+    "file": "",
+    "tty": true
+  },
+  "modules": {
+
+  }
+}
