@@ -1,6 +1,11 @@
 #!/usr/bin/python3
 
-import socket
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE
@@ -11,7 +16,7 @@ from classes.logger import alogger
 from dnslite.types import QuestionItem, AnswerItem
 
 import threading
-
+import socket
 
 conf = Configuration.get_instance()
 log = alogger.getLogger("main", conf)
