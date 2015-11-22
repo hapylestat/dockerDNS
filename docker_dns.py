@@ -46,11 +46,14 @@ def handle_ptr_record(q: QuestionItem) -> AnswerItem:
 
   return answer
 
+def handle_aaaa_record(q: QuestionItem) -> AnswerItem:
+  return None
 
 def handle_connection(sock):
   handlers = {
     "A": handle_a_record,
-    "PTR": handle_ptr_record
+    "PTR": handle_ptr_record,
+    "AAAA": handle_aaaa_record
   }
 
   while True:
