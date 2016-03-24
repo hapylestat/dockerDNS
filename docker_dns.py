@@ -9,7 +9,7 @@
 
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE, QuestionTypes
-from dnslite.datapack import ip_to_in_addr
+from dnslite.datapack import in_addr_to_ip
 from appcore.core import Configuration
 from appcore.core import aLogger
 from classes.docker import doker
@@ -23,7 +23,6 @@ conf = Configuration.get_instance()
 log = aLogger.getLogger("main", conf)
 listen = conf.get("listen", default="127.0.0.1", check_type=str)
 port = conf.get("port", default=53, check_type=int)
-listen_ptr = ip_to_in_addr(listen, 4)
 myname = conf.get("myname", default="FakeServer", check_type=str)
 
 
@@ -40,10 +39,14 @@ def handle_a_record(q: QuestionItem) -> AnswerItem:
 
 
 def handle_ptr_record(q: QuestionItem) -> AnswerItem:
-  if q.qname_str == listen_ptr:
+  if in_addr_to_ip(q.qname_str) == listen:
     answer = q.get_answer(myname)
   else:
-    answer = None
+    hostname= doker.container_name_by_ip(in_addr_to_ip(q.qname_str))
+    if hostname is not None:
+      answer = q.get_answer()
+    else:
+      answer = None
 
   return answer
 

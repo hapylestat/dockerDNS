@@ -22,11 +22,22 @@ class DockerInfo(object):
     name = name.split(".")
     try:
       info = self._conn.inspect_container(name[0])
-      if info is not None:
-        if "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
+      if info is not None and "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
           return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
     except Exception as e:
       return None
     return None
+
+  def container_name_by_ip(self, ip:str):
+    containerIDS = self._conn.containers()
+    for containerID in containerIDS:
+      container_obj = self._conn.inspect_container(containerID)
+      if container_obj is not None and "NetworkSettings" in container_obj and "IPAddress" in container_obj["NetworkSettings"]:
+        container_ip = container_obj["NetworkSettings"]["IPAddress"] if container_obj["NetworkSettings"]["IPAddress"].strip() else None
+        if container_ip == ip:
+          return "%s.%s" % (container_obj["Config"]["Hostname"], container_obj["Config"]["Domainname"])
+
+
+
 
 doker = DockerInfo()

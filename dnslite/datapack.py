@@ -19,6 +19,15 @@ def ip_to_in_addr(ipstring: str, ver: int = 4) -> str:
     return ".".join(ip + ["in-addr", "arpa"])
 
 
+def in_addr_to_ip(in_addr: str, ver: int =4) -> str:
+  if ver == 4:
+    ip_block = in_addr.split(".")
+    if ".".join(ip_block[-2:]) == "in-addr.arpa":
+      ip_block = ip_block[:-2]
+      ip_block.reverse()
+      return ".".join(ip_block)
+
+
 def get_bit(_bitfield, name):
   _bit_mask = header_flags[name][1]
   _bit_len = _bit_mask.bit_length()
