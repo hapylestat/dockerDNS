@@ -75,5 +75,25 @@ WantedBy=multi-user.target
 - systemctl enable dockerdns
 - systemctl start dockerdns 
 
+# Integration with BIND
+
+Zone configuration:
+```
+zone "docker.zone" IN {
+  type forward;
+  forwarders { 127.0.0.3; };
+};
+```
+Reverse zone:
+```
+zone "10.168.192.in-addr.arpa" IN {
+  type forward;
+  forwarders { 127.0.0.3; };
+};
+```
+
+Where docker.zone is your docker domain name, 192.168.10.0/24 docker address space. To forward reverse queries, BIND require 
+"empty-zones-enable no;" in the named.conf settings
+
 
 [logo]: http://www.gnu.org/graphics/lgplv3-147x51.png
