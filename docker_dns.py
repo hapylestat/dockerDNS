@@ -42,9 +42,9 @@ def handle_ptr_record(q: QuestionItem) -> AnswerItem:
   if in_addr_to_ip(q.qname_str) == listen:
     answer = q.get_answer(myname)
   else:
-    hostname= doker.container_name_by_ip(in_addr_to_ip(q.qname_str))
+    hostname = doker.container_name_by_ip(in_addr_to_ip(q.qname_str))
     if hostname is not None:
-      answer = q.get_answer()
+      answer = q.get_answer(hostname)
     else:
       answer = None
 
