@@ -6,13 +6,13 @@
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 from docker import Client
-from appcore.core import Configuration
+from appcore.core import config
 from appcore.core import aLogger
 
 
 class DockerInfo(object):
   def __init__(self):
-    cfg = Configuration.get_instance()
+    cfg = config.get_instance()
     self.cfg = cfg
     self.log = aLogger.getLogger(self.__class__.__name__, self.cfg)
     self.__url = self.cfg.get("docker.url", check_type=str)

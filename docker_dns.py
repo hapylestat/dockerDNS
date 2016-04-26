@@ -10,7 +10,7 @@
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE, QuestionTypes
 from dnslite.datapack import in_addr_to_ip
-from appcore.core import Configuration
+from appcore.core import config
 from appcore.core import aLogger
 from classes.docker import doker
 
@@ -19,7 +19,7 @@ from dnslite.types import QuestionItem, AnswerItem
 import threading
 import socket
 
-conf = Configuration.get_instance()
+conf = config.get_instance()
 log = aLogger.getLogger("main", conf)
 listen = conf.get("listen", default="127.0.0.1", check_type=str)
 port = conf.get("port", default=53, check_type=int)
