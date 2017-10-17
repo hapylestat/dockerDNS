@@ -6,14 +6,16 @@
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 from docker import Client
-from appcore.core import config
-from appcore.core import aLogger
+from apputils.core import Configuration
+from apputils.core import aLogger
 
 
 class DockerInfo(object):
-  def __init__(self):
-    cfg = config.get_instance()
-    self.cfg = cfg
+  def __init__(self, conf):
+    """
+    :type conf Configuration
+    """
+    self.cfg = conf
     self.log = aLogger.getLogger(self.__class__.__name__, self.cfg)
     self.__url = self.cfg.get("docker.url", check_type=str)
     self._conn = Client(self.__url)
@@ -29,15 +31,10 @@ class DockerInfo(object):
     return None
 
   def container_name_by_ip(self, ip:str):
-    containerIDS = self._conn.containers()
-    for containerID in containerIDS:
-      container_obj = self._conn.inspect_container(containerID)
+    container_ids = self._conn.containers()
+    for container_id in container_ids:
+      container_obj = self._conn.inspect_container(container_id)
       if container_obj is not None and "NetworkSettings" in container_obj and "IPAddress" in container_obj["NetworkSettings"]:
         container_ip = container_obj["NetworkSettings"]["IPAddress"] if container_obj["NetworkSettings"]["IPAddress"].strip() else None
         if container_ip == ip:
           return "%s.%s" % (container_obj["Config"]["Hostname"], container_obj["Config"]["Domainname"])
-
-
-
-
-doker = DockerInfo()

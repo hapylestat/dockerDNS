@@ -10,16 +10,17 @@
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE, QuestionTypes
 from dnslite.datapack import in_addr_to_ip
-from appcore.core import config
-from appcore.core import aLogger
-from classes.docker import doker
+from apputils.core import Configuration
+from apputils.core import aLogger
+from classes.docker import DockerInfo
 
 from dnslite.types import QuestionItem, AnswerItem
 
 import threading
 import socket
 
-conf = config.get_instance()
+conf = Configuration()
+docker = DockerInfo(conf)
 log = aLogger.getLogger("main", conf)
 listen = conf.get("listen", default="127.0.0.1", check_type=str)
 port = conf.get("port", default=53, check_type=int)
@@ -30,7 +31,7 @@ def handle_a_record(q: QuestionItem) -> AnswerItem:
   if q.qname_str == myname:
     answer = q.get_answer(listen)
   else:
-    ip = doker.get_ip_info(q.qname_str)
+    ip = docker.get_ip_info(q.qname_str)
     if ip is None:
       return RCODE.NAME_ERROR
 
@@ -42,7 +43,7 @@ def handle_ptr_record(q: QuestionItem) -> AnswerItem:
   if in_addr_to_ip(q.qname_str) == listen:
     answer = q.get_answer(myname)
   else:
-    hostname = doker.container_name_by_ip(in_addr_to_ip(q.qname_str))
+    hostname = docker.container_name_by_ip(in_addr_to_ip(q.qname_str))
     if hostname is not None:
       answer = q.get_answer(hostname)
     else:
@@ -102,6 +103,7 @@ def main():
     log.info("User interrupt, exiting....")
   finally:
     udps.close()
+
 
 if __name__ == '__main__':
   main()

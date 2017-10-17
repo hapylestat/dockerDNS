@@ -1,2 +1,2 @@
 docker-py===1.8.0
-git+https://github.com/hapylestat/appcore.git
+apputils
