@@ -11,17 +11,21 @@ from dnslite.base import DNSPacket
 from dnslite.constants import RCODE, QuestionTypes
 from dnslite.datapack import in_addr_to_ip
 from apputils.core import Configuration
-from apputils.core import aLogger
 from classes.docker import DockerInfo
-
 from dnslite.types import QuestionItem, AnswerItem
 
-import threading
+import logging
 import socket
+
+import asyncio
+
 
 conf = Configuration()
 docker = DockerInfo(conf)
-log = aLogger.getLogger("main", conf)
+
+logging.basicConfig(level=logging.INFO, format='%(threadName)s %(message)s')
+
+log = logging.getLogger(__name__)
 listen = conf.get("listen", default="127.0.0.1", check_type=str)
 port = conf.get("port", default=53, check_type=int)
 myname = conf.get("myname", default="FakeServer", check_type=str)
@@ -56,25 +60,25 @@ def handle_aaaa_record(q: QuestionItem) -> AnswerItem:
   return None
 
 
-def handle_connection(sock):
+class DNSProtocol(asyncio.DatagramProtocol):
+  sock = None
   handlers = {
     "A": handle_a_record,
     "PTR": handle_ptr_record,
     "AAAA": handle_aaaa_record
   }
 
-  while True:
-    data, addr = sock.recvfrom(1024)
+  def datagram_received(self, data, addr):
     m = DNSPacket(data)
 
     for item in m.question_section:
-      log.debug(item)
+      log.info(item)
 
     q = m.get_question(0)
     ret_code = RCODE.NO_ERROR
 
-    if q.qtype_name in handlers:
-      answer = handlers[q.qtype_name](q)
+    if q.qtype_name in self.handlers:
+      answer = self.handlers[q.qtype_name](q)
       if answer is None:
         pass  # send back empty answer section
       elif isinstance(answer, int):
@@ -85,24 +89,24 @@ def handle_connection(sock):
       ret_code = RCODE.NOT_IMPLEMENTED
 
     m.prepare_answer(ret_code)
-    sock.sendto(m.raw(), addr)
+    self.sock.sendto(m.raw(), addr)
+
+  def error_received(self, exc):
+    pass
 
 
 def main():
+  loop = asyncio.get_event_loop()
+
   log.info("Start listening on udp %s:%s...", listen, port)
-  udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  udps.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-  udps.bind((listen, port))
 
-  th = threading.Thread(target=handle_connection, args=(udps,))
-  th.start()
+  DNSProtocol.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  DNSProtocol.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  DNSProtocol.sock.bind((listen, port))
 
-  try:
-    th.join()
-  except KeyboardInterrupt:
-    log.info("User interrupt, exiting....")
-  finally:
-    udps.close()
+  _server = loop.create_datagram_endpoint(DNSProtocol, sock=DNSProtocol.sock)
+  loop.run_until_complete(_server)
+  loop.run_forever()
 
 
 if __name__ == '__main__':

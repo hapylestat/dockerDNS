@@ -7,7 +7,6 @@
 
 from docker import Client
 from apputils.core import Configuration
-from apputils.core import aLogger
 
 
 class DockerInfo(object):
@@ -16,7 +15,6 @@ class DockerInfo(object):
     :type conf Configuration
     """
     self.cfg = conf
-    self.log = aLogger.getLogger(self.__class__.__name__, self.cfg)
     self.__url = self.cfg.get("docker.url", check_type=str)
     self._conn = Client(self.__url)
 
@@ -26,7 +24,7 @@ class DockerInfo(object):
       info = self._conn.inspect_container(name[0])
       if info is not None and "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
           return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
-    except Exception as e:
+    except Exception:
       return None
     return None
 
