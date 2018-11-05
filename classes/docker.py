@@ -22,7 +22,7 @@ class DockerInfo(object):
   def get_ip_info(self, name: str):
     name, _, _ = name.partition(".")
     try:
-      info = self._conn.inspect_container(name[0])
+      info = self._conn.inspect_container(name)
       if info is not None and "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
           return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
     except Exception:
