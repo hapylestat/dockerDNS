@@ -5,21 +5,22 @@
 #
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
-from docker import Client
-from apputils.core import Configuration
+from docker import APIClient as Client
 
 
 class DockerInfo(object):
-  def __init__(self, conf):
+  def __init__(self, url):
     """
-    :type conf Configuration
+    :type url str
     """
-    self.cfg = conf
-    self.__url = self.cfg.get("docker.url", check_type=str)
+    self.__url = url
     self._conn = Client(self.__url)
 
+  def ping(self):
+    return self._conn.ping()
+
   def get_ip_info(self, name: str):
-    name = name.split(".")
+    name, _, _ = name.partition(".")
     try:
       info = self._conn.inspect_container(name[0])
       if info is not None and "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:

@@ -2,7 +2,7 @@
   "listen": "127.0.0.3",
   "port": 53,
   "myname": "dockerDNS",
-  "docker": {
-    "url": "tcp://127.0.0.3:4243"
-  }
+  "docker": [
+    "tcp://127.0.0.3:4243"
+  ]
 }

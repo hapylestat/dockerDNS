@@ -21,7 +21,7 @@ import asyncio
 
 
 conf = Configuration()
-docker = DockerInfo(conf)
+dockers = [DockerInfo(url) for url in conf.get("docker")]
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s %(message)s')
 
@@ -35,7 +35,12 @@ def handle_a_record(q: QuestionItem) -> AnswerItem:
   if q.qname_str == myname:
     answer = q.get_answer(listen)
   else:
-    ip = docker.get_ip_info(q.qname_str)
+    ip = None
+    for docker in dockers:
+      ip = docker.get_ip_info(q.qname_str)
+      if ip:
+        break
+
     if ip is None:
       return RCODE.NAME_ERROR
 
@@ -47,7 +52,12 @@ def handle_ptr_record(q: QuestionItem) -> AnswerItem:
   if in_addr_to_ip(q.qname_str) == listen:
     answer = q.get_answer(myname)
   else:
-    hostname = docker.container_name_by_ip(in_addr_to_ip(q.qname_str))
+    hostname = None
+    for docker in dockers:
+      hostname = docker.container_name_by_ip(in_addr_to_ip(q.qname_str))
+      if hostname:
+        break
+
     if hostname is not None:
       answer = q.get_answer(hostname)
     else:
