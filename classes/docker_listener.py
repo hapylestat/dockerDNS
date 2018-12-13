@@ -4,8 +4,43 @@
 # GNU Lesser General Public License for more details.
 #
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
+import logging
+from dataclasses import dataclass
 
 from docker import APIClient as Client
+from classes.async_tools import AsyncIteratorExecutor
+
+
+@dataclass
+class DockerContainerInfo(object):
+  name: str = None
+  ip: str = None
+  dccker: str = None
+
+
+class DockerListener(object):
+  def __init__(self, uris):
+    """
+    :type uris list[str]
+    """
+    self._log = logging.getLogger(__name__)
+    self._dockers = []
+    for url in uris:
+      try:
+        self._dockers.append(Client(url))
+      except Exception as e:
+        self._log.error("Failed to initialize docker with url '{}' : {}".format(url, str(e)))
+
+  async def __read_docker_events(self, docker_index):
+    """
+    :type docker int
+    """
+    docker = self._dockers[docker_index]
+    async for event in AsyncIteratorExecutor(docker.events(decode=True)):
+      print(event)
+
+  def get_futures(self):
+    return [self.__read_docker_events(docker) for docker in range(len(self._dockers))]
 
 
 class DockerInfo(object):
@@ -24,7 +59,7 @@ class DockerInfo(object):
     try:
       info = self._conn.inspect_container(name)
       if info is not None and "NetworkSettings" in info and "IPAddress" in info["NetworkSettings"]:
-          return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
+        return info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
     except Exception:
       return None
     return None
@@ -37,3 +72,7 @@ class DockerInfo(object):
         container_ip = container_obj["NetworkSettings"]["IPAddress"] if container_obj["NetworkSettings"]["IPAddress"].strip() else None
         if container_ip == ip:
           return "%s.%s" % (container_obj["Config"]["Hostname"], container_obj["Config"]["Domainname"])
+
+
+
+
