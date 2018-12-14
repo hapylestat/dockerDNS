@@ -4,9 +4,9 @@
 # GNU Lesser General Public License for more details.
 #
 # Copyright (c) 2018 Reishin <hapy.lestat@gmail.com> and Contributors
+import asyncio
 import logging
 
-from classes.async_tools import DNSProtocolClass
 from classes.storage import ContainerKeyStorage
 from dnslite.base import DNSPacket
 from dnslite.constants import RCODE, QuestionTypes
@@ -55,11 +55,20 @@ class DNSHandlers(object):
     return {fn_name.split("_")[1].upper(): getattr(self, fn_name) for fn_name in dir(self) if fn_name.startswith("handle_")}
 
 
-class DNSProtocol(DNSProtocolClass):
+class DNSProtocol(asyncio.DatagramProtocol):
+  _name = None
+
   def __init__(self):
     super(DNSProtocol, self).__init__()
     self.log = logging.getLogger(__name__)
-    self.handlers = DNSHandlers(self._myname, self._listen).get_handlers()
+    self.handlers = None
+    self._sock = None
+
+  def connection_made(self, transport):
+    self._sock = transport._sock
+    addr, port = self._sock.getsockname()
+    self.log.info("Start listening on udp %s:%s", addr, port)
+    self.handlers = DNSHandlers(self._name, addr).get_handlers()
 
   def datagram_received(self, data, addr):
     m = DNSPacket(data)
@@ -82,7 +91,7 @@ class DNSProtocol(DNSProtocolClass):
       ret_code = RCODE.NOT_IMPLEMENTED
 
     m.prepare_answer(ret_code)
-    self.sock.sendto(m.raw(), addr)
+    self._sock.sendto(m.raw(), addr)
 
   def error_received(self, exc):
     pass

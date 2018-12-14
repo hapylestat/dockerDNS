@@ -6,7 +6,6 @@
 # Copyright (c) 2018 Reishin <hapy.lestat@gmail.com> and Contributors
 
 import asyncio
-import socket
 
 
 class AsyncIteratorExecutor(object):
@@ -30,56 +29,3 @@ class AsyncIteratorExecutor(object):
       raise StopAsyncIteration
 
     return value
-
-
-class DNSProtocolClass(asyncio.DatagramProtocol):
-  _sock = None
-  _myname = None
-  _listen = None
-
-  def datagram_received(self, data, addr):
-    """Called when some datagram is received."""
-    raise NotImplementedError()
-
-  def error_received(self, exc):
-    """Called when a send or receive operation raises an OSError.
-
-    (Other than BlockingIOError or InterruptedError.)
-    """
-    raise NotImplementedError()
-
-  @property
-  def sock(self):
-    return self._sock
-
-
-class AsyncDNSSock(object):
-  def __init__(self, myname, lister_addr, listern_port, dns_protocol_class):
-    """
-    :type myname str
-    :type listern_port int
-    :type lister_addr str
-    :type dns_protocol type(DNSProtocolClass)
-    """
-    self.__myname = myname
-    self.__addr = lister_addr
-    self.__port = listern_port
-    self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    self.__sock.bind((lister_addr, listern_port))
-    self.__dns_protocol_class = dns_protocol_class
-    self.__dns_protocol_class._sock = self.__sock
-    self.__dns_protocol_class._myname = self.__myname
-    self.__dns_protocol_class._listen = self.__addr
-
-  def get_future(self, loop):
-    """
-    return future for asynio
-
-    :type loop asyncio.AbstractEventLoop
-    """
-    return loop.create_datagram_endpoint(self.__dns_protocol_class, sock=self.__sock)
-
-  @property
-  def sock(self):
-    return self.__sock
