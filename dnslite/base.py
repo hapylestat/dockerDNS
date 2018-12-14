@@ -147,7 +147,7 @@ class DNSPacket(object):
       ret += self.question_section[i].raw()
 
     for i in range(0, len(self.answer_section)):
-      offset = qoffset[i] if len(qoffset) >= i else -1
+      offset = qoffset[0] if len(qoffset) >= i else -1
       ret += self.answer_section[i].raw(offset)
 
     return ret

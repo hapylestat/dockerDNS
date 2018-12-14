@@ -7,8 +7,9 @@
 import logging
 
 from classes.async_tools import DNSProtocolClass
+from classes.storage import ContainerKeyStorage
 from dnslite.base import DNSPacket
-from dnslite.constants import RCODE
+from dnslite.constants import RCODE, QuestionTypes
 from dnslite.datapack import in_addr_to_ip
 from dnslite.types import QuestionItem, AnswerItem
 
@@ -21,40 +22,34 @@ class DNSHandlers(object):
 
   def handle_a_record(self, q: QuestionItem) -> AnswerItem:
     if q.qname_str == self._myname:
-      answer = q.get_answer(self._listen)
+      return q.get_answer(self._listen)
     else:
-      ip = None
-      # for docker in dockers:
-      #   ip = docker.get_ip_info(q.qname_str)
-      #   if ip:
-      #     break
+      name = q.qname_str.partition(".")[0]  # we not really need a domain name
+      container = ContainerKeyStorage.get_by_name(name)
 
-      if ip is None:
+      if container is None:
         return RCODE.NAME_ERROR
 
-      answer = q.get_answer(ip)
-    return answer
+      return q.get_answer(container.ip)
 
-  def handle_ptr_record(self, q: QuestionItem) -> AnswerItem:
+  def handle_ptr_record(self, q: QuestionItem) -> AnswerItem or None:
     if in_addr_to_ip(q.qname_str) == self._listen:
-      answer = q.get_answer(self._myname)
+      return q.get_answer(self._myname)
     else:
-      hostname = None
-      # for docker in dockers:
-      #   hostname = docker.container_name_by_ip(in_addr_to_ip(q.qname_str))
-      #   if hostname:
-      #     break
+      container = ContainerKeyStorage.get_by_ip(in_addr_to_ip(q.qname_str))
 
-      if hostname is not None:
-        answer = q.get_answer(hostname)
-      else:
-        answer = None
+      if not container:
+        return None
 
-    return answer
+      return q.get_answer(container.name)
 
   @staticmethod
   def handle_aaaa_record(q: QuestionItem) -> AnswerItem:
     return None
+
+  @staticmethod
+  def handle_txt_record(q: QuestionItem) -> AnswerItem:
+    return q.get_answer("check later, not implemented yet")
 
   def get_handlers(self):
     return {fn_name.split("_")[1].upper(): getattr(self, fn_name) for fn_name in dir(self) if fn_name.startswith("handle_")}
@@ -69,8 +64,8 @@ class DNSProtocol(DNSProtocolClass):
   def datagram_received(self, data, addr):
     m = DNSPacket(data)
 
-    for item in m.question_section:
-      self.log.info(item)
+    # for item in m.question_section:
+    #   self.log.info(item)
 
     q = m.get_question(0)
     ret_code = RCODE.NO_ERROR

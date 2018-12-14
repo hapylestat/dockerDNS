@@ -12,6 +12,9 @@ import time
 import random
 
 
+# FORMAT HELP:  https://www.ietf.org/rfc/rfc1035.txt
+
+
 def ip_to_in_addr(ipstring: str, ver: int = 4) -> str:
   if ver == 4:
     ip = ipstring.split(".")
@@ -19,7 +22,7 @@ def ip_to_in_addr(ipstring: str, ver: int = 4) -> str:
     return ".".join(ip + ["in-addr", "arpa"])
 
 
-def in_addr_to_ip(in_addr: str, ver: int =4) -> str:
+def in_addr_to_ip(in_addr: str, ver: int = 4) -> str:
   if ver == 4:
     ip_block = in_addr.split(".")
     if ".".join(ip_block[-2:]) == "in-addr.arpa":
@@ -53,7 +56,7 @@ def generate_message_id() -> bytes:
     raise TypeError("Non 16-bit seed used")
 
 
-def bread(byte_data: bytes, count: int, update_offset: int=None, data_fx=None):
+def bread(byte_data: bytes, count: int, update_offset: int = None, data_fx=None):
   """
   :param byte_data: bytedata to read
   :param count: count of the data to read
@@ -128,7 +131,18 @@ def unpack_ptr_response(data: bytes) -> str:
   return ".".join(_str)
 
 
+def pack_txt_response(name) -> tuple:
+  bname = str(name).encode("UTF-8")
+  ret = bytes([len(bname)]) + str(name).encode("UTF-8")
+  return ret, len(ret)
+
+
+def unpack_txt_response(data: bytes) -> str:
+  raise NotImplementedError()
+
+
 # register packer/unpacker
 QuestionTypes.set_fx("A", pack_a_response, unpack_a_response)
 QuestionTypes.set_fx("PTR", pack_ptr_response, unpack_ptr_response)
 QuestionTypes.set_fx("NS", pack_ptr_response, unpack_ptr_response)
+QuestionTypes.set_fx("TXT", pack_txt_response, unpack_txt_response)

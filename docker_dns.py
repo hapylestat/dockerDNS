@@ -8,11 +8,11 @@
 # Copyright (c) 2015 Reishin <hapy.lestat@gmail.com> and Contributors
 
 
-from classes.async_tools import AsyncIteratorExecutor, AsyncDNSSock
+from classes.async_tools import AsyncDNSSock
 from apputils.core import Configuration
 
 from classes.dns_listener import DNSProtocol
-from classes.docker_listener import DockerInfo, DockerListener
+from classes.docker_listener import DockerListener
 
 import logging
 import asyncio
@@ -35,7 +35,7 @@ def main():
 
   futures = docker_listener.get_futures()
 
-  log.info("Start listening on udp %s:%s...", listen, port)
+  log.info("Start listening on udp %s:%s", listen, port)
   futures.append(AsyncDNSSock(myname, listen, port, DNSProtocol).get_future(loop))
 
   loop.run_until_complete(asyncio.gather(*futures))
