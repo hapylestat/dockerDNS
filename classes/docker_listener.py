@@ -91,6 +91,7 @@ class DockerListener(object):
 
           if action in (DockerActions.die, DockerActions.kill, DockerActions.stop):
             ContainerKeyStorage.delete(name)
+            self._log.info("Removing '{}' container from the cache".format(name))
           elif action == DockerActions.start:
             info = docker.inspect_container(name)
             ip = None
@@ -98,6 +99,7 @@ class DockerListener(object):
               ip = info["NetworkSettings"]["IPAddress"] if info["NetworkSettings"]["IPAddress"].strip() != "" else None
 
             ContainerKeyStorage.add(DockerContainerInfo(name=name, ip=ip, docker=docker_index))
+            self._log.info("Adding '{}' container to cache with ip: {}".format(name, ip))
       except:
         self._log.error("Failed to subscribe to server {} events".format(docker.base_url))
         await asyncio.sleep(30)
