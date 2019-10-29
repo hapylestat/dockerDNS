@@ -90,8 +90,9 @@ class DockerListener(object):
           action = event["Action"]
 
           if action in (DockerActions.die, DockerActions.kill, DockerActions.stop):
-            ContainerKeyStorage.delete(name)
-            self._log.info("Removing '{}' container from the cache".format(name))
+            if ContainerKeyStorage.exists(name):
+              ContainerKeyStorage.delete(name)
+              self._log.info("Removing '{}' container from the cache".format(name))
           elif action == DockerActions.start:
             info = docker.inspect_container(name)
             ip = None

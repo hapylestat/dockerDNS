@@ -46,3 +46,7 @@ class ContainerKeyStorage(object):
       del cls._ip_storage[ip]
     except (KeyError, TypeError):
       pass
+
+  @classmethod
+  def exists(cls, name: str) -> bool:
+    return name in cls._name_storage
